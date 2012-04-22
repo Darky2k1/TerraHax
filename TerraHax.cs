@@ -4,12 +4,12 @@ using System.Linq;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using Mono.Cecil;
+using Mono.Cecil.Cil;
 using TerrariAPI;
 using TerrariAPI.Commands;
 using TerrariAPI.Hooking;
 using TerrariAPI.Plugins;
-using Mono.Cecil.Cil;
-using Mono.Cecil;
 
 namespace TerraHax
 {
@@ -20,6 +20,7 @@ namespace TerraHax
         public override int version { get { return 1; } }
 
         public static bool fullbright;
+        public static bool gps;
 
         public TerraHax()
         {
@@ -30,93 +31,113 @@ namespace TerraHax
 
         void TerraHax_onHook(object sender, PluginEventArgs e)
         {
-            MethodDefinition terrariaLighting = GetMethod("Lighting", "LightColor");
-            ILProcessor ilpL = terrariaLighting.Body.GetILProcessor();
-            Instruction fL = terrariaLighting.Body.Instructions[0];
-            ilpL.InsertBefore(fL, ilpL.Create(OpCodes.Ldsfld, e.asm.MainModule.Import(typeof(TerraHax).GetField("fullbright"))));
-            ilpL.InsertBefore(fL, ilpL.Create(OpCodes.Brfalse, fL));
-            ilpL.InsertBefore(fL, ilpL.Create(OpCodes.Ldc_R4, 1f));
-            ilpL.InsertBefore(fL, ilpL.Create(OpCodes.Stsfld, GetField("Lighting", "negLight")));
-            ilpL.InsertBefore(fL, ilpL.Create(OpCodes.Ldc_R4, 1f));
-            ilpL.InsertBefore(fL, ilpL.Create(OpCodes.Stsfld, GetField("Lighting", "wetLightR")));
-            ilpL.InsertBefore(fL, ilpL.Create(OpCodes.Ldc_R4, 1f));
-            ilpL.InsertBefore(fL, ilpL.Create(OpCodes.Stsfld, GetField("Lighting", "negLight2")));
+            ILProcessor temp = null;
+            Instruction tempInstr = null;
+            #region Main
+            MethodDefinition draw = e.asm.GetMethod("Main", "Draw");
+            temp = draw.Body.GetILProcessor();
+            temp.InsertBefore(draw.Body.Instructions[0], temp.Create(OpCodes.Call, e.asm.MainModule.Import(typeof(TerraHax).GetMethod("TerraHax_beforeDraw"))));
+            #endregion
+            #region Lighting
+            MethodDefinition terrariaLighting = e.asm.GetMethod("Lighting", "LightColor");
+            temp = terrariaLighting.Body.GetILProcessor();
+            tempInstr = terrariaLighting.Body.Instructions[0];
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Ldsfld, e.asm.MainModule.Import(typeof(TerraHax).GetField("fullbright"))));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Brfalse, tempInstr));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Ldc_R4, 1f));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Stsfld, e.asm.GetField("Lighting", "negLight")));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Ldc_R4, 1f));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Stsfld, e.asm.GetField("Lighting", "wetLightR")));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Ldc_R4, 1f));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Stsfld, e.asm.GetField("Lighting", "negLight2")));
 
-            terrariaLighting = GetMethod("Lighting", "LightColor2");
-            ilpL = terrariaLighting.Body.GetILProcessor();
-            fL = terrariaLighting.Body.Instructions[0];
-            ilpL.InsertBefore(fL, ilpL.Create(OpCodes.Ldsfld, e.asm.MainModule.Import(typeof(TerraHax).GetField("fullbright"))));
-            ilpL.InsertBefore(fL, ilpL.Create(OpCodes.Brfalse, fL));
-            ilpL.InsertBefore(fL, ilpL.Create(OpCodes.Ldc_R4, 0f));
-            ilpL.InsertBefore(fL, ilpL.Create(OpCodes.Stsfld, GetField("Lighting", "negLight")));
-            ilpL.InsertBefore(fL, ilpL.Create(OpCodes.Ldc_R4, 0f));
-            ilpL.InsertBefore(fL, ilpL.Create(OpCodes.Stsfld, GetField("Lighting", "wetLightR")));
-            ilpL.InsertBefore(fL, ilpL.Create(OpCodes.Ldc_R4, 0f));
-            ilpL.InsertBefore(fL, ilpL.Create(OpCodes.Stsfld, GetField("Lighting", "negLight2")));
+            terrariaLighting = e.asm.GetMethod("Lighting", "LightColor2");
+            temp = terrariaLighting.Body.GetILProcessor();
+            tempInstr = terrariaLighting.Body.Instructions[0];
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Ldsfld, e.asm.MainModule.Import(typeof(TerraHax).GetField("fullbright"))));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Brfalse, tempInstr));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Ldc_R4, 0f));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Stsfld, e.asm.GetField("Lighting", "negLight")));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Ldc_R4, 0f));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Stsfld, e.asm.GetField("Lighting", "wetLightR")));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Ldc_R4, 0f));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Stsfld, e.asm.GetField("Lighting", "negLight2")));
 
-            terrariaLighting = GetMethod("Lighting", "LightColorG");
-            ilpL = terrariaLighting.Body.GetILProcessor();
-            fL = terrariaLighting.Body.Instructions[0];
-            ilpL.InsertBefore(fL, ilpL.Create(OpCodes.Ldsfld, e.asm.MainModule.Import(typeof(TerraHax).GetField("fullbright"))));
-            ilpL.InsertBefore(fL, ilpL.Create(OpCodes.Brfalse, fL));
-            ilpL.InsertBefore(fL, ilpL.Create(OpCodes.Ldc_R4, 1f));
-            ilpL.InsertBefore(fL, ilpL.Create(OpCodes.Stsfld, GetField("Lighting", "negLight")));
-            ilpL.InsertBefore(fL, ilpL.Create(OpCodes.Ldc_R4, 1f));
-            ilpL.InsertBefore(fL, ilpL.Create(OpCodes.Stsfld, GetField("Lighting", "wetLightR")));
-            ilpL.InsertBefore(fL, ilpL.Create(OpCodes.Ldc_R4, 1f));
-            ilpL.InsertBefore(fL, ilpL.Create(OpCodes.Stsfld, GetField("Lighting", "negLight2")));
+            terrariaLighting = e.asm.GetMethod("Lighting", "LightColorG");
+            temp = terrariaLighting.Body.GetILProcessor();
+            tempInstr = terrariaLighting.Body.Instructions[0];
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Ldsfld, e.asm.MainModule.Import(typeof(TerraHax).GetField("fullbright"))));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Brfalse, tempInstr));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Ldc_R4, 1f));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Stsfld, e.asm.GetField("Lighting", "negLight")));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Ldc_R4, 1f));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Stsfld, e.asm.GetField("Lighting", "wetLightR")));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Ldc_R4, 1f));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Stsfld, e.asm.GetField("Lighting", "negLight2")));
 
-            terrariaLighting = GetMethod("Lighting", "LightColorG2");
-            ilpL = terrariaLighting.Body.GetILProcessor();
-            fL = terrariaLighting.Body.Instructions[0];
-            ilpL.InsertBefore(fL, ilpL.Create(OpCodes.Ldsfld, e.asm.MainModule.Import(typeof(TerraHax).GetField("fullbright"))));
-            ilpL.InsertBefore(fL, ilpL.Create(OpCodes.Brfalse, fL));
-            ilpL.InsertBefore(fL, ilpL.Create(OpCodes.Ldc_R4, 0f));
-            ilpL.InsertBefore(fL, ilpL.Create(OpCodes.Stsfld, GetField("Lighting", "negLight")));
-            ilpL.InsertBefore(fL, ilpL.Create(OpCodes.Ldc_R4, 0f));
-            ilpL.InsertBefore(fL, ilpL.Create(OpCodes.Stsfld, GetField("Lighting", "wetLightR")));
-            ilpL.InsertBefore(fL, ilpL.Create(OpCodes.Ldc_R4, 0f));
-            ilpL.InsertBefore(fL, ilpL.Create(OpCodes.Stsfld, GetField("Lighting", "negLight2")));
+            terrariaLighting = e.asm.GetMethod("Lighting", "LightColorG2");
+            temp = terrariaLighting.Body.GetILProcessor();
+            tempInstr = terrariaLighting.Body.Instructions[0];
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Ldsfld, e.asm.MainModule.Import(typeof(TerraHax).GetField("fullbright"))));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Brfalse, tempInstr));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Ldc_R4, 0f));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Stsfld, e.asm.GetField("Lighting", "negLight")));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Ldc_R4, 0f));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Stsfld, e.asm.GetField("Lighting", "wetLightR")));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Ldc_R4, 0f));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Stsfld, e.asm.GetField("Lighting", "negLight2")));
 
-            terrariaLighting = GetMethod("Lighting", "LightColorB");
-            ilpL = terrariaLighting.Body.GetILProcessor();
-            fL = terrariaLighting.Body.Instructions[0];
-            ilpL.InsertBefore(fL, ilpL.Create(OpCodes.Ldsfld, e.asm.MainModule.Import(typeof(TerraHax).GetField("fullbright"))));
-            ilpL.InsertBefore(fL, ilpL.Create(OpCodes.Brfalse, fL));
-            ilpL.InsertBefore(fL, ilpL.Create(OpCodes.Ldc_R4, 1f));
-            ilpL.InsertBefore(fL, ilpL.Create(OpCodes.Stsfld, GetField("Lighting", "negLight")));
-            ilpL.InsertBefore(fL, ilpL.Create(OpCodes.Ldc_R4, 1f));
-            ilpL.InsertBefore(fL, ilpL.Create(OpCodes.Stsfld, GetField("Lighting", "wetLightR")));
-            ilpL.InsertBefore(fL, ilpL.Create(OpCodes.Ldc_R4, 1f));
-            ilpL.InsertBefore(fL, ilpL.Create(OpCodes.Stsfld, GetField("Lighting", "negLight2")));
+            terrariaLighting = e.asm.GetMethod("Lighting", "LightColorB");
+            temp = terrariaLighting.Body.GetILProcessor();
+            tempInstr = terrariaLighting.Body.Instructions[0];
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Ldsfld, e.asm.MainModule.Import(typeof(TerraHax).GetField("fullbright"))));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Brfalse, tempInstr));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Ldc_R4, 1f));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Stsfld, e.asm.GetField("Lighting", "negLight")));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Ldc_R4, 1f));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Stsfld, e.asm.GetField("Lighting", "wetLightR")));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Ldc_R4, 1f));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Stsfld, e.asm.GetField("Lighting", "negLight2")));
 
-            terrariaLighting = GetMethod("Lighting", "LightColorB2");
-            ilpL = terrariaLighting.Body.GetILProcessor();
-            fL = terrariaLighting.Body.Instructions[0];
-            ilpL.InsertBefore(fL, ilpL.Create(OpCodes.Ldsfld, e.asm.MainModule.Import(typeof(TerraHax).GetField("fullbright"))));
-            ilpL.InsertBefore(fL, ilpL.Create(OpCodes.Brfalse, fL));
-            ilpL.InsertBefore(fL, ilpL.Create(OpCodes.Ldc_R4, 0f));
-            ilpL.InsertBefore(fL, ilpL.Create(OpCodes.Stsfld, GetField("Lighting", "negLight")));
-            ilpL.InsertBefore(fL, ilpL.Create(OpCodes.Ldc_R4, 0f));
-            ilpL.InsertBefore(fL, ilpL.Create(OpCodes.Stsfld, GetField("Lighting", "wetLightR")));
-            ilpL.InsertBefore(fL, ilpL.Create(OpCodes.Ldc_R4, 0f));
-            ilpL.InsertBefore(fL, ilpL.Create(OpCodes.Stsfld, GetField("Lighting", "negLight2")));
+            terrariaLighting = e.asm.GetMethod("Lighting", "LightColorB2");
+            temp = terrariaLighting.Body.GetILProcessor();
+            tempInstr = terrariaLighting.Body.Instructions[0];
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Ldsfld, e.asm.MainModule.Import(typeof(TerraHax).GetField("fullbright"))));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Brfalse, tempInstr));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Ldc_R4, 0f));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Stsfld, e.asm.GetField("Lighting", "negLight")));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Ldc_R4, 0f));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Stsfld, e.asm.GetField("Lighting", "wetLightR")));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Ldc_R4, 0f));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Stsfld, e.asm.GetField("Lighting", "negLight2")));
+            #endregion
         }
 
         void TerraHax_onInitialize(object sender, PluginEventArgs e)
         {
-            Command.Add(new Command("clearinv", ClearInv));
-            Command.Add(new Command("damage", Damage));
-            Command.Add(new Command("fullbright", Fullbright));
-            Command.Add(new Command("maxstack", MaxStack));
-            Command.Add(new Command("netsend", NetSend));
-            Command.Add(new Command("tp", Tp));
+            AddCommand(new Command("clearinv", ClearInv));
+            AddCommand(new Command("damage", Damage));
+            AddCommand(new Command("fullbright", Fullbright));
+            AddCommand(new Command("gps", GPS));
+            AddCommand(new Command("maxstack", MaxStack));
+            AddCommand(new Command("netsend", NetSend));
+            AddCommand(new Command("tp", Tp));
+            AddCommand(new Command("usetime", Usetime));
         }
         void TerraHax_onUpdate(object sender, PluginEventArgs e)
         {
             if (fullbright)
             {
                 Wrapper.lighting.LightTile((int)Wrapper.main.currPlayer.position.X / 16, (int)Wrapper.main.currPlayer.position.Y / 16, 1.0f);
+            }
+        }
+        public static void TerraHax_beforeDraw()
+        {
+            if (gps)
+            {
+                Wrapper.main.currPlayer.accCompass = 2;
+                Wrapper.main.currPlayer.accDepthMeter = 1;
+                Wrapper.main.currPlayer.accWatch = 3;
             }
         }
 
@@ -151,6 +172,12 @@ namespace TerraHax
         {
             fullbright = !fullbright;
             PrintNotification((fullbright ? "En" : "Dis") + "abled fullbright.");
+        }
+        [Description("Toggles the GPS.")]
+        void GPS(object sender, CommandEventArgs e)
+        {
+            gps = !gps;
+            PrintNotification((gps ? "En" : "Dis") + "abled GPS.");
         }
         [Description("Maximizes the stack size of items.")]
         void MaxStack(object sender, CommandEventArgs e)
@@ -251,6 +278,23 @@ namespace TerraHax
                 Wrapper.netMessage.SendData(13, "", Wrapper.main.Get("myPlayer"));
                 PrintNotification("Teleported to " + Wrapper.main.players[index].name + ".");
             }
+        }
+        [Description("Sets the usetime of the selected item.")]
+        void Usetime(object sender, CommandEventArgs e)
+        {
+            if (e.length != 1)
+            {
+                PrintError("Syntax: usetime <time>");
+                return;
+            }
+            int useTime;
+            if (!int.TryParse(e[0], out useTime))
+            {
+                PrintError("Invalid damage.");
+                return;
+            }
+            Wrapper.main.currentItem.useTime = useTime;
+            PrintNotification("Set selected item's usetime to " + useTime + ".");
         }
     }
 }
