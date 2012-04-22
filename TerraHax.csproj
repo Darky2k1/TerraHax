@@ -90,6 +90,16 @@
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <Import Project="$(MSBuildExtensionsPath)\Microsoft\XNA Game Studio\Microsoft.Xna.GameStudio.targets" />
+  <PropertyGroup>
+    <PostBuildEvent>cd OutDir
+rm Mono.Cecil.dll
+rm TerrariAPI.exe
+rm TerrariAPI.pdb
+rm TerrariAPI.xml
+rm XNAForms.dll
+rm XNAForms.pdb
+rm XNAForms.xml</PostBuildEvent>
+  </PropertyGroup>
   <!--
       To modify your build process, add your task inside one of the targets below and uncomment it. 
       Other similar extension points exist, see Microsoft.Common.targets.

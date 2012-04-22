@@ -17,10 +17,12 @@ namespace TerraHax
     {
         public override string author { get { return "MarioE"; } }
         public override string name { get { return "TerraHax"; } }
-        public override int version { get { return 1; } }
+        public override int version { get { return 2; } }
 
         public static bool fullbright;
+        public static bool godMode;
         public static bool gps;
+        public static bool pickupItems;
 
         public TerraHax()
         {
@@ -111,6 +113,39 @@ namespace TerraHax
             temp.InsertBefore(tempInstr, temp.Create(OpCodes.Ldc_R4, 0f));
             temp.InsertBefore(tempInstr, temp.Create(OpCodes.Stsfld, e.asm.GetField("Lighting", "negLight2")));
             #endregion
+            #region Player
+            MethodDefinition getItem = e.asm.GetMethod("Player", "GetItem");
+            temp = getItem.Body.GetILProcessor();
+            tempInstr = getItem.Body.Instructions[0];
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Ldarg_1));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Ldsfld, e.asm.GetField("Main", "myPlayer")));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Bne_Un, tempInstr));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Ldsfld, e.asm.MainModule.Import(typeof(TerraHax).GetField("pickupItems"))));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Brfalse, tempInstr));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Newobj, e.asm.GetMethod("Item", ".ctor")));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Ret));
+            MethodDefinition hurt = e.asm.GetMethod("Player", "Hurt");
+            temp = hurt.Body.GetILProcessor();
+            tempInstr = hurt.Body.Instructions[0];
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Ldarg_0));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Ldfld, e.asm.GetField("Player", "whoAmi")));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Ldsfld, e.asm.GetField("Main", "myPlayer")));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Bne_Un, tempInstr));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Ldsfld, e.asm.MainModule.Import(typeof(TerraHax).GetField("godMode"))));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Brfalse, tempInstr));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Ldc_R8, 0.0));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Ret));
+            MethodDefinition killMe = e.asm.GetMethod("Player", "KillMe");
+            temp = killMe.Body.GetILProcessor();
+            tempInstr = killMe.Body.Instructions[0];
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Ldarg_0));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Ldfld, e.asm.GetField("Player", "whoAmi")));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Ldsfld, e.asm.GetField("Main", "myPlayer")));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Bne_Un, tempInstr));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Ldsfld, e.asm.MainModule.Import(typeof(TerraHax).GetField("godMode"))));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Brfalse, tempInstr));
+            temp.InsertBefore(tempInstr, temp.Create(OpCodes.Ret));
+            #endregion
         }
 
         void TerraHax_onInitialize(object sender, PluginEventArgs e)
@@ -118,9 +153,10 @@ namespace TerraHax
             AddCommand(new Command("clearinv", ClearInv));
             AddCommand(new Command("damage", Damage));
             AddCommand(new Command("fullbright", Fullbright));
+            AddCommand(new Command("god", God));
             AddCommand(new Command("gps", GPS));
+            AddCommand(new Command("itempickup", ItemPickup));
             AddCommand(new Command("maxstack", MaxStack));
-            AddCommand(new Command("netsend", NetSend));
             AddCommand(new Command("tp", Tp));
             AddCommand(new Command("usetime", Usetime));
         }
@@ -128,28 +164,51 @@ namespace TerraHax
         {
             if (fullbright)
             {
-                Wrapper.lighting.LightTile((int)Wrapper.main.currPlayer.position.X / 16, (int)Wrapper.main.currPlayer.position.Y / 16, 1.0f);
+                Lighting.LightTile((int)Main.currPlayer.position.X / 16, (int)Main.currPlayer.position.Y / 16, 1.0f);
+            }
+            if (godMode)
+            {
+                for (int i = 0; i < 10; i++)
+                {
+                    if (Main.debuff[Main.currPlayer.buffType[i]])
+                    {
+                        Main.currPlayer.buffTime[i] = 0;
+                    }
+                }
+                Main.currPlayer.breath = 200;
             }
         }
         public static void TerraHax_beforeDraw()
         {
+            if (godMode)
+            {
+                for (int i = 0; i < 10; i++)
+                {
+                    if (Main.debuff[Main.currPlayer.buffType[i]])
+                    {
+                        Main.currPlayer.buffTime[i] = 0;
+                    }
+                }
+                Main.currPlayer.breath = 200;
+            }
             if (gps)
             {
-                Wrapper.main.currPlayer.accCompass = 2;
-                Wrapper.main.currPlayer.accDepthMeter = 1;
-                Wrapper.main.currPlayer.accWatch = 3;
+                Main.currPlayer.accCompass = 2;
+                Main.currPlayer.accDepthMeter = 1;
+                Main.currPlayer.accWatch = 3;
             }
         }
-
+        [Alias("clrinv", "cinv")]
         [Description("Completely clears the inventory except for the hotbar.")]
         void ClearInv(object sender, CommandEventArgs e)
         {
-            for (int i = 10; i < Wrapper.main.currPlayer.inventory.Length; i++)
+            for (int i = 10; i < Main.currPlayer.inventory.Length; i++)
             {
-                Wrapper.main.currPlayer.inventory[i] = Wrapper.item.New();
+                Main.currPlayer.inventory[i] = Item.New();
             }
             PrintNotification("Cleared inventory.");
         }
+        [Alias("dam")]
         [Description("Sets the damage of the selected item.")]
         void Damage(object sender, CommandEventArgs e)
         {
@@ -164,14 +223,21 @@ namespace TerraHax
                 PrintError("Invalid damage.");
                 return;
             }
-            Wrapper.main.currentItem.damage = damage;
+            Main.currItem.damage = damage;
             PrintNotification("Set selected item's damage to " + damage + ".");
         }
+        [Alias("fb", "light")]
         [Description("Toggles the ability to see everything on the screen.")]
         void Fullbright(object sender, CommandEventArgs e)
         {
             fullbright = !fullbright;
             PrintNotification((fullbright ? "En" : "Dis") + "abled fullbright.");
+        }
+        [Description("Toggles god mode.")]
+        void God(object sender, CommandEventArgs e)
+        {
+            godMode = !godMode;
+            PrintNotification((godMode ? "En" : "Dis") + "abled god mode.");
         }
         [Description("Toggles the GPS.")]
         void GPS(object sender, CommandEventArgs e)
@@ -179,6 +245,14 @@ namespace TerraHax
             gps = !gps;
             PrintNotification((gps ? "En" : "Dis") + "abled GPS.");
         }
+        [Alias("itemp")]
+        [Description("Toggles picking up items.")]
+        void ItemPickup(object sender, CommandEventArgs e)
+        {
+            pickupItems = !pickupItems;
+            PrintNotification((pickupItems ? "En" : "Dis") + "abled item pickups.");
+        }
+        [Alias("maxs")]
         [Description("Maximizes the stack size of items.")]
         void MaxStack(object sender, CommandEventArgs e)
         {
@@ -189,7 +263,7 @@ namespace TerraHax
             }
             if (e.length == 0)
             {
-                Wrapper.main.currentItem.stack = Wrapper.main.currentItem.maxStack;
+                Main.currItem.stack = Main.currItem.maxStack;
                 PrintNotification("Maximized selected item's stack size.");
             }
             else
@@ -197,18 +271,18 @@ namespace TerraHax
                 switch (e[0])
                 {
                     case "all":
-                        for (int i = 0; i < Wrapper.main.currPlayer.inventory.Length; i++)
+                        for (int i = 0; i < Main.currPlayer.inventory.Length; i++)
                         {
-                            Wrapper.main.currPlayer.inventory[i].stack = Wrapper.main.currPlayer.inventory[i].maxStack;
+                            Main.currPlayer.inventory[i].stack = Main.currPlayer.inventory[i].maxStack;
                         }
                         PrintNotification("Maximized all items' stack size.");
                         break;
                     case "ammo":
-                        for (int i = 0; i < Wrapper.main.currPlayer.inventory.Length; i++)
+                        for (int i = 0; i < Main.currPlayer.inventory.Length; i++)
                         {
-                            if (Wrapper.main.currPlayer.inventory[i].ammo)
+                            if (Main.currPlayer.inventory[i].ammo)
                             {
-                                Wrapper.main.currPlayer.inventory[i].stack = Wrapper.main.currPlayer.inventory[i].maxStack;
+                                Main.currPlayer.inventory[i].stack = Main.currPlayer.inventory[i].maxStack;
                             }
                         }
                         PrintNotification("Maximized all ammos' stack size.");
@@ -217,50 +291,6 @@ namespace TerraHax
                         PrintError("Invalid maxstack option.");
                         return;
                 }
-            }
-        }
-        [Description("Directly sends network data.")]
-        void NetSend(object sender, CommandEventArgs e)
-        {
-            if (e.length < 1 || e.length > 7)
-            {
-                PrintError("Syntax: netsend <packet ID> [<arg1>] [<arg2>] [<arg3>] [<arg4>] [<arg5>] [<arg6>]");
-                return;
-            }
-            int packet;
-            if (!int.TryParse(e[0], out packet))
-            {
-                PrintError("Invalid packet ID.");
-                return;
-            }
-            int num1 = 0, num5 = 0;
-            float num2 = 0, num3 = 0, num4 = 0;
-            string str = "";
-            try
-            {
-                if (!int.TryParse(e[2], out num1))
-                {
-                    PrintError("Invalid integer.");
-                    return;
-                }
-                if (!float.TryParse(e[3], out num2) || !float.TryParse(e[4], out num3) || !float.TryParse(e[5], out num4))
-                {
-                    PrintError("Invalid float.");
-                    return;
-                }
-                if (!int.TryParse(e[6], out num5))
-                {
-                    PrintError("Invalid integer.");
-                    return;
-                }
-            }
-            catch (IndexOutOfRangeException)
-            {
-            }
-            finally
-            {
-                Wrapper.netMessage.SendData(packet, str, num1, num2, num3, num4, num5);
-                PrintNotification("Sent " + packet + ", " + (str == "" ? "\"\"" : str) + ", " + num1 + ", " + num2 + ", " + num3 + ", " + num4 + ", " + num5);
             }
         }
         [Description("Teleports you to another player.")]
@@ -274,11 +304,12 @@ namespace TerraHax
             int index = Command.GetPlayer(e[0]);
             if (index >= 0)
             {
-                Wrapper.main.currPlayer.position = Wrapper.main.players[index].position;
-                Wrapper.netMessage.SendData(13, "", Wrapper.main.Get("myPlayer"));
-                PrintNotification("Teleported to " + Wrapper.main.players[index].name + ".");
+                Main.currPlayer.position = Main.players[index].position;
+                NetMessage.SendData(13, "", Main.playerIndex);
+                PrintNotification("Teleported to " + Main.players[index].name + ".");
             }
         }
+        [Alias("uset")]
         [Description("Sets the usetime of the selected item.")]
         void Usetime(object sender, CommandEventArgs e)
         {
@@ -293,7 +324,7 @@ namespace TerraHax
                 PrintError("Invalid damage.");
                 return;
             }
-            Wrapper.main.currentItem.useTime = useTime;
+            Main.currItem.useTime = useTime;
             PrintNotification("Set selected item's usetime to " + useTime + ".");
         }
     }
