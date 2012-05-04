@@ -19,7 +19,6 @@ namespace TerraHax
     {
         public override string author { get { return "MarioE"; } }
         public override string name { get { return "TerraHax"; } }
-        public override int version { get { return 3; } }
 
         public static bool fullbright;
         public static bool godMode;
@@ -33,6 +32,7 @@ namespace TerraHax
             onHook += TerraHax_onHook;
             onInitialize += TerraHax_onInitialize;
             onUpdate += TerraHax_onUpdate;
+            onUpdate2 += Terrahax_onUpdate2;
         }
 
         FieldInfo GetField(string name)
@@ -150,6 +150,8 @@ namespace TerraHax
 
         void TerraHax_onInitialize(object sender, PluginEventArgs e)
         {
+            AddCommand(new Command("ammo", Ammo));
+            AddCommand(new Command("autoreuse", AutoReuse));
             AddCommand(new Command("clearinv", ClearInv));
             AddCommand(new Command("damage", Damage));
             AddCommand(new Command("fullbright", Fullbright));
@@ -159,6 +161,8 @@ namespace TerraHax
             AddCommand(new Command("jump", Jump));
             AddCommand(new Command("maxstack", MaxStack));
             AddCommand(new Command("noclip", Noclip));
+            AddCommand(new Command("shoot", Shoot));
+            AddCommand(new Command("shootspeed", ShootSpeed));
             AddCommand(new Command("tp", Tp));
             AddCommand(new Command("usetime", Usetime));
         }
@@ -170,27 +174,47 @@ namespace TerraHax
             }
             if (godMode)
             {
+                Main.currPlayer.statLife = Main.currPlayer.statLifeMax;
                 for (int i = 0; i < 10; i++)
                 {
                     if (Main.debuff[Main.currPlayer.buffType[i]])
                     {
-                        Main.currPlayer.buffTime[i] = 0;
+                        Main.currPlayer.DelBuff(i);
                     }
                 }
                 Main.currPlayer.breath = 200;
             }
             if (noclip)
             {
-                Keys[] keys = Keyboard.GetState().GetPressedKeys();
-                foreach (Keys key in keys)
+                if (!disableKeys && !Main.currPlayer.dead)
                 {
-                    switch (key)
+                    int dist = Input.Shift ? 32 : 16;
+                    if (Main.currPlayer.controlUp)
                     {
-                        case Keys.Left:
-                            Main.currPlayer.position = new Vector2(Main.currPlayer.position.X - 20, Main.currPlayer.position.Y);
-                            break;
+                        Main.currPlayer.position = new Vector2(Main.currPlayer.position.X, Main.currPlayer.position.Y - dist);
+                    }
+                    if (Main.currPlayer.controlLeft)
+                    {
+                        Main.currPlayer.position = new Vector2(Main.currPlayer.position.X - dist, Main.currPlayer.position.Y);
+                    }
+                    if (Main.currPlayer.controlRight)
+                    {
+                        Main.currPlayer.position = new Vector2(Main.currPlayer.position.X + dist, Main.currPlayer.position.Y);
+                    }
+                    if (Main.currPlayer.controlDown)
+                    {
+                        Main.currPlayer.position = new Vector2(Main.currPlayer.position.X, Main.currPlayer.position.Y + dist);
                     }
                 }
+                Main.currPlayer.velocity = Vector2.Zero;
+            }
+            prevPosition = Main.currPlayer.position;
+        }
+        void Terrahax_onUpdate2(object sender, PluginEventArgs e)
+        {
+            if (noclip)
+            {
+                Main.currPlayer.position = prevPosition;
             }
         }
         public static void TerraHax_beforeDraw()
@@ -213,6 +237,31 @@ namespace TerraHax
                 Main.currPlayer.accWatch = 3;
             }
         }
+        [Alias("ammo")]
+        [Description("Sets the item used as ammo for the selected item.")]
+        void Ammo(object sender, CommandEventArgs e)
+        {
+            if (e.length != 1)
+            {
+                PrintError("Syntax: ammo <item ID>");
+                return;
+            }
+            int ammo;
+            if (!int.TryParse(e[0], out ammo))
+            {
+                PrintError("Invalid ammo.");
+                return;
+            }
+            Main.currItem.useAmmo = ammo;
+            PrintNotification("Set selected item's ammo to " + ammo + ".");
+        }
+        [Alias("ar")]
+        [Description("Toggles the autoreuse-ness of the selected item.")]
+        void AutoReuse(object sender, CommandEventArgs e)
+        {
+            Main.currItem.autoReuse = !Main.currItem.autoReuse;
+            PrintNotification((Main.currItem.autoReuse ? "En" : "Dis") + "abled autoreuse for the selected item.");
+        }
         [Alias("cinv")]
         [Description("Completely clears the inventory except for the hotbar.")]
         void ClearInv(object sender, CommandEventArgs e)
@@ -233,7 +282,7 @@ namespace TerraHax
                 return;
             }
             int damage;
-            if (!int.TryParse(e[0], out damage))
+            if (!int.TryParse(e[0], out damage) || damage <= 0)
             {
                 PrintError("Invalid damage.");
                 return;
@@ -241,7 +290,7 @@ namespace TerraHax
             Main.currItem.damage = damage;
             PrintNotification("Set selected item's damage to " + damage + ".");
         }
-        [Alias("light")]
+        [Alias("fb", "light")]
         [Description("Toggles the ability to see everything on the screen.")]
         void Fullbright(object sender, CommandEventArgs e)
         {
@@ -300,7 +349,7 @@ namespace TerraHax
                     case "ammo":
                         for (int i = 0; i < Main.currPlayer.inventory.Length; i++)
                         {
-                            if (Main.currPlayer.inventory[i].ammo)
+                            if (Main.currPlayer.inventory[i].ammo != 0)
                             {
                                 Main.currPlayer.inventory[i].stack = Main.currPlayer.inventory[i].maxStack;
                             }
@@ -313,11 +362,45 @@ namespace TerraHax
                 }
             }
         }
+        [Alias("nc")]
         [Description("Moves the player to the cursor location.")]
         void Noclip(object sender, CommandEventArgs e)
         {
             noclip = !noclip;
             PrintNotification((noclip ? "En" : "Dis") + "abled noclip.");
+        }
+        [Description("Sets the projectile of the selected item.")]
+        void Shoot(object sender, CommandEventArgs e)
+        {
+            if (e.length != 1)
+            {
+                PrintError("Syntax: shoot <projectile>");
+                return;
+            }
+            Match match = Command.GetProjectile(e[0]);
+            if (match.ID >= 0)
+            {
+                Main.currItem.shoot = match.ID;
+                PrintNotification("Set selected item to shoot " + match.name + ".");
+            }
+        }
+        [Alias("ss")]
+        [Description("Sets the shooting speed of the selected item.")]
+        void ShootSpeed(object sender, CommandEventArgs e)
+        {
+            if (e.length != 1)
+            {
+                PrintError("Syntax: shootspeed <speed>");
+                return;
+            }
+            float shootSpeed;
+            if (!float.TryParse(e[0], out shootSpeed))
+            {
+                PrintError("Invalid shoot speed.");
+                return;
+            }
+            Main.currItem.shootSpeed = shootSpeed;
+            PrintNotification("Set selected item's shoot speed to " + shootSpeed + ".");
         }
         [Description("Teleports you to another player.")]
         void Tp(object sender, CommandEventArgs e)
@@ -327,15 +410,15 @@ namespace TerraHax
                 PrintError("Syntax: tp <player>");
                 return;
             }
-            int index = Command.GetPlayer(e[0]);
-            if (index >= 0)
+            Match match = Command.GetPlayer(e[0]);
+            if (match.ID >= 0)
             {
-                Main.currPlayer.position = Main.players[index].position;
+                Main.currPlayer.position = Main.players[match.ID].position;
                 NetMessage.SendData(13, "", Main.playerIndex);
-                PrintNotification("Teleported to " + Main.players[index].name + ".");
+                PrintNotification("Teleported to " + match.name + ".");
             }
         }
-        [Alias("uset")]
+        [Alias("ut")]
         [Description("Sets the usetime of the selected item.")]
         void Usetime(object sender, CommandEventArgs e)
         {
@@ -347,7 +430,7 @@ namespace TerraHax
             int useTime;
             if (!int.TryParse(e[0], out useTime))
             {
-                PrintError("Invalid damage.");
+                PrintError("Invalid usetime.");
                 return;
             }
             Main.currItem.useTime = useTime;
