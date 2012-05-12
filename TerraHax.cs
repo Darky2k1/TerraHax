@@ -23,6 +23,7 @@ namespace TerraHax
         public static bool fullbright;
         public static bool godMode;
         public static bool gps;
+        public static bool[] infBuff;
         public static bool noclip;
         public static bool pickupItems;
         public static Vector2 prevPosition;
@@ -150,13 +151,18 @@ namespace TerraHax
 
         void TerraHax_onInitialize(object sender, PluginEventArgs e)
         {
+            infBuff = new bool[Main.buffNames.Length];
+
             AddCommand(new Command("ammo", Ammo));
             AddCommand(new Command("autoreuse", AutoReuse));
+            AddCommand(new Command("buff", Buff));
             AddCommand(new Command("clearinv", ClearInv));
             AddCommand(new Command("damage", Damage));
             AddCommand(new Command("fullbright", Fullbright));
             AddCommand(new Command("god", God));
             AddCommand(new Command("gps", GPS));
+            AddCommand(new Command("infbuff", InfBuff));
+            AddCommand(new Command("item", Item));
             AddCommand(new Command("itempickup", ItemPickup));
             AddCommand(new Command("jump", Jump));
             AddCommand(new Command("maxstack", MaxStack));
@@ -168,6 +174,24 @@ namespace TerraHax
         }
         void TerraHax_onUpdate(object sender, PluginEventArgs e)
         {
+            for (int i = 0; i < infBuff.Length; i++)
+            {
+                if (infBuff[i])
+                {
+                    bool buffed = false;
+                    for (int j = 0; j < Main.currPlayer.buffType.Length; j++)
+                    {
+                        if (i == Main.currPlayer.buffType[j])
+                        {
+                            Main.currPlayer.buffTime[j] = 2;
+                        }
+                    }
+                    if (!buffed)
+                    {
+                        Main.currPlayer.AddBuff(i, 2);
+                    }
+                }
+            }
             if (fullbright)
             {
                 Lighting.LightTile((int)Main.currPlayer.position.X / 16, (int)Main.currPlayer.position.Y / 16, 1.0f);
@@ -175,7 +199,7 @@ namespace TerraHax
             if (godMode)
             {
                 Main.currPlayer.statLife = Main.currPlayer.statLifeMax;
-                for (int i = 0; i < 10; i++)
+                for (int i = 0; i < Main.currPlayer.buffType.Length; i++)
                 {
                     if (Main.debuff[Main.currPlayer.buffType[i]])
                     {
@@ -237,7 +261,6 @@ namespace TerraHax
                 Main.currPlayer.accWatch = 3;
             }
         }
-        [Alias("ammo")]
         [Description("Sets the item used as ammo for the selected item.")]
         void Ammo(object sender, CommandEventArgs e)
         {
@@ -262,13 +285,34 @@ namespace TerraHax
             Main.currItem.autoReuse = !Main.currItem.autoReuse;
             PrintNotification((Main.currItem.autoReuse ? "En" : "Dis") + "abled autoreuse for the selected item.");
         }
+        [Description("Adds buffs.")]
+        void Buff(object sender, CommandEventArgs e)
+        {
+            if (e.length != 1 && e.length != 2)
+            {
+                PrintError("Syntax: buff <buff> [<time>]");
+                return;
+            }
+            Match match = Command.GetBuff(e[0]);
+            if (match.ID > 0)
+            {
+                int time = 300;
+                if (e.length == 2 && !int.TryParse(e[1], out time))
+                {
+                    PrintError("Invalid time.");
+                    return;
+                }
+                Main.currPlayer.AddBuff(match.ID, time * 60);
+                PrintNotification("Buffed " + match.name + " for " + time + " seconds.");
+            }
+        }
         [Alias("cinv")]
         [Description("Completely clears the inventory except for the hotbar.")]
         void ClearInv(object sender, CommandEventArgs e)
         {
             for (int i = 10; i < Main.currPlayer.inventory.Length; i++)
             {
-                Main.currPlayer.inventory[i] = Item.New();
+                Main.currPlayer.inventory[i] = TerrariAPI.Hooking.Item.New();
             }
             PrintNotification("Cleared inventory.");
         }
@@ -309,10 +353,47 @@ namespace TerraHax
             gps = !gps;
             PrintNotification((gps ? "En" : "Dis") + "abled GPS.");
         }
-        [Description("Moves the player to the cursor location.")]
-        void Jump(object sender, CommandEventArgs e)
+        [Alias("ibuff")]
+        [Description("Adds infinite buffs.")]
+        void InfBuff(object sender, CommandEventArgs e)
         {
-            Main.currPlayer.position = Main.screenPosition + new Vector2(Input.mX, Input.mY);
+            if (e.length != 1 && e.length != 2)
+            {
+                PrintError("Syntax: infbuff <buff>");
+                return;
+            }
+            Match match = Command.GetBuff(e[0]);
+            if (match.ID > 0)
+            {
+                infBuff[match.ID] = !infBuff[match.ID];
+                PrintNotification((infBuff[match.ID] ? "En" : "Dis") + "abled infinite buff for " + match.name + ".");
+            }
+        }
+        [Alias("i")]
+        [Description("Spawns items.")]
+        void Item(object sender, CommandEventArgs e)
+        {
+            if (e.length != 1 && e.length != 2)
+            {
+                PrintError("Syntax: item <item> [<stack>]");
+                return;
+            }
+            Match match = Command.GetItem(e[0]);
+            if (match.ID > 0)
+            {
+                dynamic item = TerrariAPI.Hooking.Item.New();
+                item.SetDefaults(match.ID);
+                int stack = item.maxStack;
+                if (e.length == 2 && !int.TryParse(e[1], out stack))
+                {
+                    PrintError("Invalid stack size.");
+                    return;
+                }
+                int index = TerrariAPI.Hooking.Item.NewItem((int)Main.currPlayer.position.X, (int)Main.currPlayer.position.Y,
+                    Main.currPlayer.width, Main.currPlayer.height, match.ID, stack);
+                Main.items[index] = Main.currPlayer.GetItem(Main.playerIndex, Main.items[index]);
+                PrintNotification("Spawned " + stack + " " + match.name + "(s).");
+            }
         }
         [Alias("itemp")]
         [Description("Toggles picking up items.")]
@@ -321,7 +402,12 @@ namespace TerraHax
             pickupItems = !pickupItems;
             PrintNotification((pickupItems ? "Dis" : "En") + "abled item pickups.");
         }
-        [Alias("maxs")]
+        [Description("Moves the player to the cursor location.")]
+        void Jump(object sender, CommandEventArgs e)
+        {
+            Main.currPlayer.position = Main.screenPosition + new Vector2(Input.mX, Input.mY);
+        }
+        [Alias("max")]
         [Description("Maximizes the stack size of items.")]
         void MaxStack(object sender, CommandEventArgs e)
         {
@@ -363,7 +449,7 @@ namespace TerraHax
             }
         }
         [Alias("nc")]
-        [Description("Moves the player to the cursor location.")]
+        [Description("Toggles noclip.")]
         void Noclip(object sender, CommandEventArgs e)
         {
             noclip = !noclip;
