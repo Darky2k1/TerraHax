@@ -26,6 +26,7 @@ namespace TerraHax
         public static bool[] infBuff;
         public static bool noclip;
         public static bool pickupItems;
+        public static bool ruler;
         public static Vector2 prevPosition;
 
         public TerraHax()
@@ -161,12 +162,14 @@ namespace TerraHax
             AddCommand(new Command("fullbright", Fullbright));
             AddCommand(new Command("god", God));
             AddCommand(new Command("gps", GPS));
+            AddCommand(new Command("heal", Heal));
             AddCommand(new Command("infbuff", InfBuff));
             AddCommand(new Command("item", Item));
             AddCommand(new Command("itempickup", ItemPickup));
             AddCommand(new Command("jump", Jump));
             AddCommand(new Command("maxstack", MaxStack));
             AddCommand(new Command("noclip", Noclip));
+            AddCommand(new Command("ruler", Ruler));
             AddCommand(new Command("shoot", Shoot));
             AddCommand(new Command("shootspeed", ShootSpeed));
             AddCommand(new Command("tp", Tp));
@@ -212,7 +215,7 @@ namespace TerraHax
             {
                 if (!disableKeys && !Main.currPlayer.dead)
                 {
-                    int dist = Input.Shift ? 32 : 16;
+                    int dist = Input.Shift ? 64 : 16;
                     if (Main.currPlayer.controlUp)
                     {
                         Main.currPlayer.position = new Vector2(Main.currPlayer.position.X, Main.currPlayer.position.Y - dist);
@@ -249,7 +252,7 @@ namespace TerraHax
                 {
                     if (Main.debuff[Main.currPlayer.buffType[i]])
                     {
-                        Main.currPlayer.buffTime[i] = 0;
+                        Main.currPlayer.DelBuff(i);
                     }
                 }
                 Main.currPlayer.breath = 200;
@@ -259,6 +262,10 @@ namespace TerraHax
                 Main.currPlayer.accCompass = 2;
                 Main.currPlayer.accDepthMeter = 1;
                 Main.currPlayer.accWatch = 3;
+            }
+            if (ruler)
+            {
+                Main.currPlayer.rulerAcc = true;
             }
         }
         [Description("Sets the item used as ammo for the selected item.")]
@@ -307,7 +314,7 @@ namespace TerraHax
             }
         }
         [Alias("cinv")]
-        [Description("Completely clears the inventory except for the hotbar.")]
+        [Description("Clears the inventory except for the hotbar.")]
         void ClearInv(object sender, CommandEventArgs e)
         {
             for (int i = 10; i < Main.currPlayer.inventory.Length; i++)
@@ -335,7 +342,7 @@ namespace TerraHax
             PrintNotification("Set selected item's damage to " + damage + ".");
         }
         [Alias("fb", "light")]
-        [Description("Toggles the ability to see everything on the screen.")]
+        [Description("Toggles fullbright.")]
         void Fullbright(object sender, CommandEventArgs e)
         {
             fullbright = !fullbright;
@@ -353,8 +360,21 @@ namespace TerraHax
             gps = !gps;
             PrintNotification((gps ? "En" : "Dis") + "abled GPS.");
         }
+        [Description("Heals the player.")]
+        void Heal(object sender, CommandEventArgs e)
+        {
+            PrintNotification("Healed " + (Main.currPlayer.statLifeMax - Main.currPlayer.statLife) + " HP.");
+            if (Main.currPlayer.statLife != Main.currPlayer.statLifeMax)
+            {
+                for (int i = 0; i <= (Main.currPlayer.statLifeMax - Main.currPlayer.statLife) / 20; i++)
+                {
+                    int index = TerrariAPI.Hooking.Item.NewItem((int)Main.currPlayer.position.X, (int)Main.currPlayer.position.Y,
+                        Main.currPlayer.width, Main.currPlayer.height, 58);
+                }
+            }
+        }
         [Alias("ibuff")]
-        [Description("Adds infinite buffs.")]
+        [Description("Toggles infinite buffs.")]
         void InfBuff(object sender, CommandEventArgs e)
         {
             if (e.length != 1 && e.length != 2)
@@ -396,7 +416,7 @@ namespace TerraHax
             }
         }
         [Alias("itemp")]
-        [Description("Toggles picking up items.")]
+        [Description("Toggles item pickups.")]
         void ItemPickup(object sender, CommandEventArgs e)
         {
             pickupItems = !pickupItems;
@@ -455,6 +475,12 @@ namespace TerraHax
             noclip = !noclip;
             PrintNotification((noclip ? "En" : "Dis") + "abled noclip.");
         }
+        [Description("Toggles the ruler.")]
+        void Ruler(object sender, CommandEventArgs e)
+        {
+            ruler = !ruler;
+            PrintNotification((ruler ? "En" : "Dis") + "abled ruler.");
+        }
         [Description("Sets the projectile of the selected item.")]
         void Shoot(object sender, CommandEventArgs e)
         {
@@ -488,7 +514,7 @@ namespace TerraHax
             Main.currItem.shootSpeed = shootSpeed;
             PrintNotification("Set selected item's shoot speed to " + shootSpeed + ".");
         }
-        [Description("Teleports you to another player.")]
+        [Description("Teleports the player to another player.")]
         void Tp(object sender, CommandEventArgs e)
         {
             if (e.length != 1)
