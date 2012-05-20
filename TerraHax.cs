@@ -10,7 +10,6 @@ using Mono.Cecil.Cil;
 using TerrariAPI;
 using TerrariAPI.Commands;
 using TerrariAPI.Hooking;
-using TerrariAPI.Plugins;
 using XNAForms;
 
 namespace TerraHax
@@ -24,17 +23,32 @@ namespace TerraHax
         public static bool godMode;
         public static bool gps;
         public static bool[] infBuff;
+        public static bool infMana;
+        public static bool infWings;
+        public static int[] lastTeams;
         public static bool noclip;
         public static bool pickupItems;
         public static bool ruler;
+        public static bool track;
         public static Vector2 prevPosition;
 
         public TerraHax()
         {
-            onHook += TerraHax_onHook;
-            onInitialize += TerraHax_onInitialize;
-            onUpdate += TerraHax_onUpdate;
-            onUpdate2 += Terrahax_onUpdate2;
+            GameHooks.Hook += TerraHax_onHook;
+            GameHooks.Initialize += TerraHax_onInitialize;
+            GameHooks.Update += TerraHax_onUpdate;
+            GameHooks.Update2 += Terrahax_onUpdate2;
+        }
+
+        public override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                GameHooks.Hook -= TerraHax_onHook;
+                GameHooks.Initialize -= TerraHax_onInitialize;
+                GameHooks.Update -= TerraHax_onUpdate;
+                GameHooks.Update2 -= Terrahax_onUpdate2;
+            }
         }
 
         FieldInfo GetField(string name)
@@ -46,113 +60,109 @@ namespace TerraHax
             return typeof(TerraHax).GetMethod(name);
         }
 
-        void TerraHax_onHook(object sender, PluginEventArgs e)
+        void TerraHax_onHook(AssemblyDefinition asm)
         {
-            #region Main
-            e.asm.GetMethod("Main", "Draw").Body.GetILProcessor().Insert(Target.START,
-                Instruction.Create(OpCodes.Call, e.asm.MainModule.Import(GetMethod("TerraHax_beforeDraw")))
-                );
-            #endregion
             #region Lighting
-            e.asm.GetMethod("Lighting", "LightColor").Body.GetILProcessor().Insert(Target.START,
-                Instruction.Create(OpCodes.Ldsfld, e.asm.MainModule.Import(typeof(TerraHax).GetField("fullbright"))),
-                Instruction.Create(OpCodes.Brfalse, e.asm.GetMethod("Lighting", "LightColor").Body.Instructions[0]),
+            asm.GetMethod("Lighting", "LightColor").Body.GetILProcessor().Insert(Target.START,
+                Instruction.Create(OpCodes.Ldsfld, asm.MainModule.Import(typeof(TerraHax).GetField("fullbright"))),
+                Instruction.Create(OpCodes.Brfalse, asm.GetMethod("Lighting", "LightColor").Body.Instructions[0]),
                 Instruction.Create(OpCodes.Ldc_R4, 1f),
-                Instruction.Create(OpCodes.Stsfld, e.asm.GetField("Lighting", "negLight")),
+                Instruction.Create(OpCodes.Stsfld, asm.GetField("Lighting", "negLight")),
                 Instruction.Create(OpCodes.Ldc_R4, 1f),
-                Instruction.Create(OpCodes.Stsfld, e.asm.GetField("Lighting", "wetLightR")),
+                Instruction.Create(OpCodes.Stsfld, asm.GetField("Lighting", "wetLightR")),
                 Instruction.Create(OpCodes.Ldc_R4, 1f),
-                Instruction.Create(OpCodes.Stsfld, e.asm.GetField("Lighting", "negLight2"))
+                Instruction.Create(OpCodes.Stsfld, asm.GetField("Lighting", "negLight2"))
                 );
-            e.asm.GetMethod("Lighting", "LightColorG").Body.GetILProcessor().Insert(Target.START,
-                Instruction.Create(OpCodes.Ldsfld, e.asm.MainModule.Import(typeof(TerraHax).GetField("fullbright"))),
-                Instruction.Create(OpCodes.Brfalse, e.asm.GetMethod("Lighting", "LightColorG").Body.Instructions[0]),
+            asm.GetMethod("Lighting", "LightColorG").Body.GetILProcessor().Insert(Target.START,
+                Instruction.Create(OpCodes.Ldsfld, asm.MainModule.Import(typeof(TerraHax).GetField("fullbright"))),
+                Instruction.Create(OpCodes.Brfalse, asm.GetMethod("Lighting", "LightColorG").Body.Instructions[0]),
                 Instruction.Create(OpCodes.Ldc_R4, 1f),
-                Instruction.Create(OpCodes.Stsfld, e.asm.GetField("Lighting", "negLight")),
+                Instruction.Create(OpCodes.Stsfld, asm.GetField("Lighting", "negLight")),
                 Instruction.Create(OpCodes.Ldc_R4, 1f),
-                Instruction.Create(OpCodes.Stsfld, e.asm.GetField("Lighting", "wetLightR")),
+                Instruction.Create(OpCodes.Stsfld, asm.GetField("Lighting", "wetLightR")),
                 Instruction.Create(OpCodes.Ldc_R4, 1f),
-                Instruction.Create(OpCodes.Stsfld, e.asm.GetField("Lighting", "negLight2"))
+                Instruction.Create(OpCodes.Stsfld, asm.GetField("Lighting", "negLight2"))
                 );
-            e.asm.GetMethod("Lighting", "LightColorB").Body.GetILProcessor().Insert(Target.START,
-                Instruction.Create(OpCodes.Ldsfld, e.asm.MainModule.Import(typeof(TerraHax).GetField("fullbright"))),
-                Instruction.Create(OpCodes.Brfalse, e.asm.GetMethod("Lighting", "LightColorB").Body.Instructions[0]),
+            asm.GetMethod("Lighting", "LightColorB").Body.GetILProcessor().Insert(Target.START,
+                Instruction.Create(OpCodes.Ldsfld, asm.MainModule.Import(typeof(TerraHax).GetField("fullbright"))),
+                Instruction.Create(OpCodes.Brfalse, asm.GetMethod("Lighting", "LightColorB").Body.Instructions[0]),
                 Instruction.Create(OpCodes.Ldc_R4, 1f),
-                Instruction.Create(OpCodes.Stsfld, e.asm.GetField("Lighting", "negLight")),
+                Instruction.Create(OpCodes.Stsfld, asm.GetField("Lighting", "negLight")),
                 Instruction.Create(OpCodes.Ldc_R4, 1f),
-                Instruction.Create(OpCodes.Stsfld, e.asm.GetField("Lighting", "wetLightR")),
+                Instruction.Create(OpCodes.Stsfld, asm.GetField("Lighting", "wetLightR")),
                 Instruction.Create(OpCodes.Ldc_R4, 1f),
-                Instruction.Create(OpCodes.Stsfld, e.asm.GetField("Lighting", "negLight2"))
+                Instruction.Create(OpCodes.Stsfld, asm.GetField("Lighting", "negLight2"))
                 );
-            e.asm.GetMethod("Lighting", "LightColor2").Body.GetILProcessor().Insert(Target.START,
-                Instruction.Create(OpCodes.Ldsfld, e.asm.MainModule.Import(typeof(TerraHax).GetField("fullbright"))),
-                Instruction.Create(OpCodes.Brfalse, e.asm.GetMethod("Lighting", "LightColor2").Body.Instructions[0]),
+            asm.GetMethod("Lighting", "LightColor2").Body.GetILProcessor().Insert(Target.START,
+                Instruction.Create(OpCodes.Ldsfld, asm.MainModule.Import(typeof(TerraHax).GetField("fullbright"))),
+                Instruction.Create(OpCodes.Brfalse, asm.GetMethod("Lighting", "LightColor2").Body.Instructions[0]),
                 Instruction.Create(OpCodes.Ldc_R4, 0f),
-                Instruction.Create(OpCodes.Stsfld, e.asm.GetField("Lighting", "negLight")),
+                Instruction.Create(OpCodes.Stsfld, asm.GetField("Lighting", "negLight")),
                 Instruction.Create(OpCodes.Ldc_R4, 0f),
-                Instruction.Create(OpCodes.Stsfld, e.asm.GetField("Lighting", "wetLightR")),
+                Instruction.Create(OpCodes.Stsfld, asm.GetField("Lighting", "wetLightR")),
                 Instruction.Create(OpCodes.Ldc_R4, 0f),
-                Instruction.Create(OpCodes.Stsfld, e.asm.GetField("Lighting", "negLight2"))
+                Instruction.Create(OpCodes.Stsfld, asm.GetField("Lighting", "negLight2"))
                 );
-            e.asm.GetMethod("Lighting", "LightColorG2").Body.GetILProcessor().Insert(Target.START,
-                Instruction.Create(OpCodes.Ldsfld, e.asm.MainModule.Import(typeof(TerraHax).GetField("fullbright"))),
-                Instruction.Create(OpCodes.Brfalse, e.asm.GetMethod("Lighting", "LightColorG2").Body.Instructions[0]),
+            asm.GetMethod("Lighting", "LightColorG2").Body.GetILProcessor().Insert(Target.START,
+                Instruction.Create(OpCodes.Ldsfld, asm.MainModule.Import(typeof(TerraHax).GetField("fullbright"))),
+                Instruction.Create(OpCodes.Brfalse, asm.GetMethod("Lighting", "LightColorG2").Body.Instructions[0]),
                 Instruction.Create(OpCodes.Ldc_R4, 0f),
-                Instruction.Create(OpCodes.Stsfld, e.asm.GetField("Lighting", "negLight")),
+                Instruction.Create(OpCodes.Stsfld, asm.GetField("Lighting", "negLight")),
                 Instruction.Create(OpCodes.Ldc_R4, 0f),
-                Instruction.Create(OpCodes.Stsfld, e.asm.GetField("Lighting", "wetLightR")),
+                Instruction.Create(OpCodes.Stsfld, asm.GetField("Lighting", "wetLightR")),
                 Instruction.Create(OpCodes.Ldc_R4, 0f),
-                Instruction.Create(OpCodes.Stsfld, e.asm.GetField("Lighting", "negLight2"))
+                Instruction.Create(OpCodes.Stsfld, asm.GetField("Lighting", "negLight2"))
                 );
-            e.asm.GetMethod("Lighting", "LightColorB2").Body.GetILProcessor().Insert(Target.START,
-                Instruction.Create(OpCodes.Ldsfld, e.asm.MainModule.Import(typeof(TerraHax).GetField("fullbright"))),
-                Instruction.Create(OpCodes.Brfalse, e.asm.GetMethod("Lighting", "LightColorB2").Body.Instructions[0]),
+            asm.GetMethod("Lighting", "LightColorB2").Body.GetILProcessor().Insert(Target.START,
+                Instruction.Create(OpCodes.Ldsfld, asm.MainModule.Import(typeof(TerraHax).GetField("fullbright"))),
+                Instruction.Create(OpCodes.Brfalse, asm.GetMethod("Lighting", "LightColorB2").Body.Instructions[0]),
                 Instruction.Create(OpCodes.Ldc_R4, 0f),
-                Instruction.Create(OpCodes.Stsfld, e.asm.GetField("Lighting", "negLight")),
+                Instruction.Create(OpCodes.Stsfld, asm.GetField("Lighting", "negLight")),
                 Instruction.Create(OpCodes.Ldc_R4, 0f),
-                Instruction.Create(OpCodes.Stsfld, e.asm.GetField("Lighting", "wetLightR")),
+                Instruction.Create(OpCodes.Stsfld, asm.GetField("Lighting", "wetLightR")),
                 Instruction.Create(OpCodes.Ldc_R4, 0f),
-                Instruction.Create(OpCodes.Stsfld, e.asm.GetField("Lighting", "negLight2"))
+                Instruction.Create(OpCodes.Stsfld, asm.GetField("Lighting", "negLight2"))
                 );
             #endregion
             #region Player
-            Instruction getItem = e.asm.GetMethod("Player", "GetItem").Body.Instructions[0];
-            e.asm.GetMethod("Player", "GetItem").Body.GetILProcessor().Insert(Target.START,
+            Instruction getItem = asm.GetMethod("Player", "GetItem").Body.Instructions[0];
+            asm.GetMethod("Player", "GetItem").Body.GetILProcessor().Insert(Target.START,
                 Instruction.Create(OpCodes.Ldarg_1),
-                Instruction.Create(OpCodes.Ldsfld, e.asm.GetField("Main", "myPlayer")),
+                Instruction.Create(OpCodes.Ldsfld, asm.GetField("Main", "myPlayer")),
                 Instruction.Create(OpCodes.Bne_Un, getItem),
-                Instruction.Create(OpCodes.Ldsfld, e.asm.MainModule.Import(GetField("pickupItems"))),
+                Instruction.Create(OpCodes.Ldsfld, asm.MainModule.Import(GetField("pickupItems"))),
                 Instruction.Create(OpCodes.Brfalse, getItem),
-                Instruction.Create(OpCodes.Newobj, e.asm.GetMethod("Item", ".ctor")),
+                Instruction.Create(OpCodes.Newobj, asm.GetMethod("Item", ".ctor")),
                 Instruction.Create(OpCodes.Ret)
                 );
-            Instruction getHurt = e.asm.GetMethod("Player", "Hurt").Body.Instructions[0];
-            e.asm.GetMethod("Player", "Hurt").Body.GetILProcessor().Insert(Target.START,
+            Instruction getHurt = asm.GetMethod("Player", "Hurt").Body.Instructions[0];
+            asm.GetMethod("Player", "Hurt").Body.GetILProcessor().Insert(Target.START,
                 Instruction.Create(OpCodes.Ldarg_0),
-                Instruction.Create(OpCodes.Ldfld, e.asm.GetField("Player", "whoAmi")),
-                Instruction.Create(OpCodes.Ldsfld, e.asm.GetField("Main", "myPlayer")),
+                Instruction.Create(OpCodes.Ldfld, asm.GetField("Player", "whoAmi")),
+                Instruction.Create(OpCodes.Ldsfld, asm.GetField("Main", "myPlayer")),
                 Instruction.Create(OpCodes.Bne_Un, getHurt),
-                Instruction.Create(OpCodes.Ldsfld, e.asm.MainModule.Import(GetField("godMode"))),
+                Instruction.Create(OpCodes.Ldsfld, asm.MainModule.Import(GetField("godMode"))),
                 Instruction.Create(OpCodes.Brfalse, getHurt),
                 Instruction.Create(OpCodes.Ldc_R8, 0.0),
                 Instruction.Create(OpCodes.Ret)
                 );
-            Instruction killMe = e.asm.GetMethod("Player", "KillMe").Body.Instructions[0];
-            e.asm.GetMethod("Player", "KillMe").Body.GetILProcessor().Insert(Target.START,
+            Instruction killMe = asm.GetMethod("Player", "KillMe").Body.Instructions[0];
+            asm.GetMethod("Player", "KillMe").Body.GetILProcessor().Insert(Target.START,
                 Instruction.Create(OpCodes.Ldarg_0),
-                Instruction.Create(OpCodes.Ldfld, e.asm.GetField("Player", "whoAmi")),
-                Instruction.Create(OpCodes.Ldsfld, e.asm.GetField("Main", "myPlayer")),
+                Instruction.Create(OpCodes.Ldfld, asm.GetField("Player", "whoAmi")),
+                Instruction.Create(OpCodes.Ldsfld, asm.GetField("Main", "myPlayer")),
                 Instruction.Create(OpCodes.Bne_Un, killMe),
-                Instruction.Create(OpCodes.Ldsfld, e.asm.MainModule.Import(GetField("godMode"))),
+                Instruction.Create(OpCodes.Ldsfld, asm.MainModule.Import(GetField("godMode"))),
                 Instruction.Create(OpCodes.Brfalse, killMe),
                 Instruction.Create(OpCodes.Ret)
                 );
             #endregion
         }
 
-        void TerraHax_onInitialize(object sender, PluginEventArgs e)
+        void TerraHax_onInitialize()
         {
             infBuff = new bool[Main.buffNames.Length];
+            lastTeams = new int[256];
 
             AddCommand(new Command("ammo", Ammo));
             AddCommand(new Command("autoreuse", AutoReuse));
@@ -164,18 +174,23 @@ namespace TerraHax
             AddCommand(new Command("gps", GPS));
             AddCommand(new Command("heal", Heal));
             AddCommand(new Command("infbuff", InfBuff));
+            AddCommand(new Command("infmana", InfMana));
+            AddCommand(new Command("infrange", InfRange));
+            AddCommand(new Command("infwings", InfWings));
             AddCommand(new Command("item", Item));
             AddCommand(new Command("itempickup", ItemPickup));
             AddCommand(new Command("jump", Jump));
+            AddCommand(new Command("listinv", ListInv));
             AddCommand(new Command("maxstack", MaxStack));
             AddCommand(new Command("noclip", Noclip));
             AddCommand(new Command("ruler", Ruler));
             AddCommand(new Command("shoot", Shoot));
             AddCommand(new Command("shootspeed", ShootSpeed));
             AddCommand(new Command("tp", Tp));
+            AddCommand(new Command("track", Track));
             AddCommand(new Command("usetime", Usetime));
         }
-        void TerraHax_onUpdate(object sender, PluginEventArgs e)
+        void TerraHax_onUpdate()
         {
             for (int i = 0; i < infBuff.Length; i++)
             {
@@ -211,6 +226,22 @@ namespace TerraHax
                 }
                 Main.currPlayer.breath = 200;
             }
+            if (infWings)
+            {
+                Main.currPlayer.wingTime = 2;
+            }
+            if (infMana)
+            {
+                Main.currPlayer.statMana = Main.currPlayer.statManaMax2;
+            }
+            if (track)
+            {
+                for (int i = 0; i < 256; i++)
+                {
+                    Main.players[i].team = lastTeams[i];
+                }
+                Main.teamColors[4] = new Color(200, 180, 0);
+            }
             if (noclip)
             {
                 if (!disableKeys && !Main.currPlayer.dead)
@@ -237,15 +268,16 @@ namespace TerraHax
             }
             prevPosition = Main.currPlayer.position;
         }
-        void Terrahax_onUpdate2(object sender, PluginEventArgs e)
+        void Terrahax_onUpdate2()
         {
             if (noclip)
             {
                 Main.currPlayer.position = prevPosition;
             }
-        }
-        public static void TerraHax_beforeDraw()
-        {
+            if (infMana)
+            {
+                Main.currPlayer.statMana = Main.currPlayer.statManaMax2;
+            }
             if (godMode)
             {
                 for (int i = 0; i < 10; i++)
@@ -256,6 +288,15 @@ namespace TerraHax
                     }
                 }
                 Main.currPlayer.breath = 200;
+            }
+            if (track)
+            {
+                for (int i = 0; i < 256; i++)
+                {
+                    lastTeams[i] = Main.players[i].team;
+                    Main.players[i].team = 4;
+                }
+                Main.teamColors[4] = Color.White;
             }
             if (gps)
             {
@@ -268,6 +309,7 @@ namespace TerraHax
                 Main.currPlayer.rulerAcc = true;
             }
         }
+
         [Description("Sets the item used as ammo for the selected item.")]
         void Ammo(object sender, CommandEventArgs e)
         {
@@ -389,6 +431,37 @@ namespace TerraHax
                 PrintNotification((infBuff[match.ID] ? "En" : "Dis") + "abled infinite buff for " + match.name + ".");
             }
         }
+        [Alias("infm")]
+        [Description("Toggles infinite mana.")]
+        void InfMana(object sender, CommandEventArgs e)
+        {
+            infMana = !infMana;
+            PrintNotification((infMana ? "En" : "Dis") + "abled infinite mana.");
+        }
+        [Alias("infr")]
+        [Description("Toggles infinite range.")]
+        void InfRange(object sender, CommandEventArgs e)
+        {
+            bool infRange = Player.tileRangeX == 10000;
+            infRange = !infRange;
+            if (infRange)
+            {
+                Player.tileRangeX = Player.tileRangeY = 10000;
+            }
+            else
+            {
+                Player.tileRangeX = 5;
+                Player.tileRangeY = 4;
+            }
+            PrintNotification((infRange ? "En" : "Dis") + "abled infinite range.");
+        }
+        [Alias("infw")]
+        [Description("Toggles infinite wings.")]
+        void InfWings(object sender, CommandEventArgs e)
+        {
+            infWings = !infWings;
+            PrintNotification((infWings ? "En" : "Dis") + "abled infinite wings.");
+        }
         [Alias("i")]
         [Description("Spawns items.")]
         void Item(object sender, CommandEventArgs e)
@@ -426,6 +499,25 @@ namespace TerraHax
         void Jump(object sender, CommandEventArgs e)
         {
             Main.currPlayer.position = Main.screenPosition + new Vector2(Input.mX, Input.mY);
+        }
+        [Alias("linv")]
+        [Description("Lists the inventory of another player.")]
+        void ListInv(object sender, CommandEventArgs e)
+        {
+            if (e.length != 1)
+            {
+                PrintError("Syntax: listinv <player>");
+                return;
+            }
+            Match match = Command.GetPlayer(e[0]);
+            if (match.ID >= 0)
+            {
+                for (int i = 0; i < Main.players[match.ID].inventory.Length; i++)
+                {
+                    dynamic item = Main.players[match.ID].inventory[i];
+                    PrintNotification("Index " + i + ": " + item.stack + " " + item.name + ".");
+                }
+            }
         }
         [Alias("max")]
         [Description("Maximizes the stack size of items.")]
@@ -529,6 +621,12 @@ namespace TerraHax
                 NetMessage.SendData(13, "", Main.playerIndex);
                 PrintNotification("Teleported to " + match.name + ".");
             }
+        }
+        [Description("Toggles player tracking.")]
+        void Track(object sender, CommandEventArgs e)
+        {
+            track = !track;
+            PrintNotification((track ? "En" : "Dis") + "abled player tracking.");
         }
         [Alias("ut")]
         [Description("Sets the usetime of the selected item.")]
